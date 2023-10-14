@@ -9,13 +9,15 @@ use std::{
 };
 use toml::Table;
 
+use crate::Mapping;
+
 #[derive(Debug, PartialEq)]
 pub struct Config {
-    mappings: HashMap<PathBuf, PathBuf>,
+    mappings: Vec<Mapping>,
 }
 
 impl Config {
-    pub fn mappings(&self) -> &HashMap<PathBuf, PathBuf> {
+    pub fn mappings(&self) -> &Vec<Mapping> {
         &self.mappings
     }
 }
@@ -61,16 +63,16 @@ impl Error for ConfigFormatError {
 
 impl Config {
     pub fn build(content: &str) -> Result<Config, ConfigFormatError> {
-        let mut mappings = HashMap::new();
+        let mut mappings = Vec::new();
         for (i, line) in content.lines().filter(|l| !l.is_empty()).enumerate() {
             let mapping: Vec<&str> = line.split("->").collect();
             if mapping.len() != 2 {
                 return Err(ConfigFormatError::new(line, i + 1));
             }
 
-            let src = PathBuf::from(mapping[0].trim());
-            let dst = PathBuf::from(mapping[1].trim());
-            mappings.insert(src, dst);
+            let name = mapping[0].trim();
+            let target = mapping[1].trim();
+            mappings.push(Mapping::new(name, target));
         }
 
         let config = Config { mappings };
@@ -100,17 +102,18 @@ fox -- tox
     #[test]
     fn good_config() {
         let config = "
-src -> dest
-.config -> ~/.config
+name -> target
+~/.config -> my-config
 
 from/here/ -> to/there
 ";
         let result = Config::build(config);
 
-        let mut mappings = HashMap::new();
-        mappings.insert("src".into(), "dest".into());
-        mappings.insert(".config".into(), "~/.config".into());
-        mappings.insert("from/here".into(), "to/there".into());
+        let mappings = vec![
+            Mapping::new("name", "target"),
+            Mapping::new("~/.config", "my-config"),
+            Mapping::new("from/here/", "to/there"),
+        ];
 
         let expected = Ok(Config { mappings });
         assert_eq!(result, expected);

@@ -17,7 +17,7 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
-    let cfg = Config::build("src -> dest");
+    let cfg = Config::build("target -> dest");
 
     // match &cli.command {
     //     Commands::Deploy {  } => crate::,
