@@ -1,15 +1,23 @@
 use std::{error::Error, fs, io, path::PathBuf};
 
-use chrono::{Local, format::format};
+use chrono::{format::format, Local};
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
-use crate::{Mapping, clean, HOME_DIR};
+use crate::{clean, Mapping, HOME_DIR};
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct Cache {
     /// The mappings that existed after the last deploy
-    pub (in super) mappings: Option<Vec<Mapping>>,
+    pub(super) mappings: Option<Vec<Mapping>>,
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Self {
+            mappings: Some(Vec::new()),
+        }
+    }
 }
 
 impl Cache {
@@ -26,7 +34,9 @@ impl Cache {
             PathBuf::from(format!("{home}/.cache/george"))
         } else {
             // TODO: Cache error?
-            return Err("Failed to expand both $HOME and $XDG_CACHE_HOME, cannot find cache".into());
+            return Err(
+                "Failed to expand both $HOME and $XDG_CACHE_HOME, cannot find cache".into(),
+            );
         };
 
         if let Some(e) = WalkDir::new(cache_home)
@@ -49,7 +59,9 @@ impl Cache {
             PathBuf::from(format!("{home}/.cache/george"))
         } else {
             // TODO: Cache error?
-            return Err("Failed to expand both $HOME and $XDG_CACHE_HOME, cannot find cache".into());
+            return Err(
+                "Failed to expand both $HOME and $XDG_CACHE_HOME, cannot find cache".into(),
+            );
         };
 
         if !cache_home.exists() {
@@ -78,3 +90,39 @@ impl Cache {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use serial_test::serial;
+
+    use super::*;
+
+    #[test]
+    #[serial]
+    fn no_cache_no_cache_home() {
+        let cache_home =  env::current_dir().unwrap().join("cache");
+        if cache_home.exists() {
+            fs::remove_dir_all(&cache_home).unwrap();
+        }
+
+        env::remove_var("XDG_CACHE_HOME");
+        env::remove_var("HOME");
+        env::set_var("HOME", cache_home.to_str().unwrap()); 
+        let cache = Cache::load().unwrap_or_default();
+        assert!(cache.save().is_ok());
+        assert!(cache_home.exists());
+        assert!(cache_home.read_dir().unwrap().next().is_some());
+        fs::remove_dir_all(&cache_home).unwrap();
+
+        env::remove_var("HOME");
+        env::set_var("XDG_CACHE_HOME", cache_home.to_str().unwrap()); 
+        let cache = Cache::load().unwrap_or_default();
+        assert!(cache.save().is_ok());
+        assert!(cache_home.exists());
+        assert!(cache_home.read_dir().unwrap().next().is_some());
+        fs::remove_dir_all(&cache_home).unwrap();
+    }
+}
+
