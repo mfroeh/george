@@ -5,7 +5,7 @@ use walkdir::WalkDir;
 
 use crate::{
     cache::Cache,
-    clean::{self},
+    clean::{self, CleanOptions},
     config::Config,
     pretty_path, Mapping,
 };
@@ -39,7 +39,7 @@ pub fn deploy(cache: Cache, opt: DeployOptions) -> Cache {
         .collect();
 
     // If we couldn't remove some of the mappings, we have to keep them in the cache
-    let mut existing = clean::clean(Cache::new(redundant_mappings))
+    let mut existing = clean::clean(Cache::new(redundant_mappings), CleanOptions::default())
         .mappings
         .take()
         .unwrap();

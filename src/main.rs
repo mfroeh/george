@@ -4,7 +4,7 @@ use clap::{command, Parser, Subcommand};
 use env_logger::Builder;
 use george::{
     cache::Cache,
-    clean,
+    clean::{self, CleanOptions},
     config::Config,
     deploy::{deploy, DeployOptions},
 };
@@ -16,14 +16,17 @@ use std::io::Write;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    #[arg(short, long)]
+    rmdir: bool,
 }
 
 #[derive(Subcommand)]
 enum Commands {
     /// Deploys your dotfiles by creating symlinks
-    Deploy {},
+    Deploy { },
     /// Removes all (cached) created symlinks
-    Clean {},
+    Clean { },
     /// Does a clean and then a deploy
     Redeploy {},
 }
@@ -48,9 +51,9 @@ fn main() {
             let new_cache = deploy(cache, DeployOptions::new(&cfg));
             new_cache.save().expect("Failed to save cache");
         }
-        Commands::Clean {} => {
+        Commands::Clean { } => {
             let cache = Cache::load().unwrap_or_default();
-            let new_cache = clean::clean(cache);
+            let new_cache = clean::clean(cache, CleanOptions::new(cli.rmdir));
             new_cache.save().expect("Failed to save cache");
         }
         Commands::Redeploy {} => {}
