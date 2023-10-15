@@ -17,8 +17,9 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
+    /// Keep remaining empty directories
     #[arg(short, long)]
-    rmdir: bool,
+    keep_dir: bool,
 }
 
 #[derive(Subcommand)]
@@ -48,12 +49,12 @@ fn main() {
             let cfg = fs::read_to_string(".george").unwrap();
             let cfg = Config::build(&cfg).unwrap();
             let cache = Cache::load().unwrap_or_default();
-            let new_cache = deploy(cache, DeployOptions::new(cli.rmdir), cfg);
+            let new_cache = deploy(cache, DeployOptions::new(!cli.keep_dir), cfg);
             new_cache.save().expect("Failed to save cache");
         }
         Commands::Clean {} => {
             let cache = Cache::load().unwrap_or_default();
-            let new_cache = clean::clean(cache, CleanOptions::new(cli.rmdir));
+            let new_cache = clean::clean(cache, CleanOptions::new(!cli.keep_dir));
             new_cache.save().expect("Failed to save cache");
         }
         Commands::Redeploy {} => {}

@@ -1,8 +1,13 @@
-use std::{error::Error, fs, io, path::PathBuf};
+use std::{
+    error::Error,
+    fs::{self},
+    io,
+    path::PathBuf,
+};
 
 use chrono::{format::format, Local};
 use serde::{Deserialize, Serialize};
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 use crate::{clean, Mapping, HOME_DIR};
 
@@ -39,8 +44,12 @@ impl Cache {
             );
         };
 
+        let sort = |lhs: &DirEntry, rhs: &DirEntry| -> std::cmp::Ordering {
+            lhs.file_name().cmp(rhs.file_name()).reverse()
+        };
+
         if let Some(e) = WalkDir::new(cache_home)
-            .sort_by_file_name()
+            .sort_by(sort)
             .into_iter()
             .filter_map(|e| e.ok())
             .find(|f| f.path().is_file())
@@ -102,14 +111,14 @@ mod tests {
     #[test]
     #[serial]
     fn no_cache_no_cache_home() {
-        let cache_home =  env::current_dir().unwrap().join("cache");
+        let cache_home = env::current_dir().unwrap().join("cache");
         if cache_home.exists() {
             fs::remove_dir_all(&cache_home).unwrap();
         }
 
         env::remove_var("XDG_CACHE_HOME");
         env::remove_var("HOME");
-        env::set_var("HOME", cache_home.to_str().unwrap()); 
+        env::set_var("HOME", cache_home.to_str().unwrap());
         let cache = Cache::load().unwrap_or_default();
         assert!(cache.save().is_ok());
         assert!(cache_home.exists());
@@ -117,7 +126,7 @@ mod tests {
         fs::remove_dir_all(&cache_home).unwrap();
 
         env::remove_var("HOME");
-        env::set_var("XDG_CACHE_HOME", cache_home.to_str().unwrap()); 
+        env::set_var("XDG_CACHE_HOME", cache_home.to_str().unwrap());
         let cache = Cache::load().unwrap_or_default();
         assert!(cache.save().is_ok());
         assert!(cache_home.exists());
@@ -125,4 +134,3 @@ mod tests {
         fs::remove_dir_all(&cache_home).unwrap();
     }
 }
-

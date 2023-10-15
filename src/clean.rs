@@ -1,5 +1,6 @@
-use std::fs;
+use std::fs::{self, symlink_metadata};
 
+use clap::error;
 use log::{error, info, warn};
 
 use crate::{cache::Cache, pretty_path, Mapping};
@@ -20,44 +21,56 @@ pub fn clean(mut cache: Cache, opt: CleanOptions) -> Cache {
 
     for mapping in cache.mappings.take().unwrap().into_iter() {
         let Mapping { name, target } = &mapping;
-        if !mapping.name().exists() {
-            info!(
-                "{}: {} doesn't exist anymore, skipping",
+
+        if let Ok(link_target) = fs::read_link(name) {
+            // If it doesn't exist, we want to remove without checking this as it would panic
+            if link_target.exists() {
+                let link_target = link_target.canonicalize().unwrap();
+                if link_target != target.canonicalize().unwrap() {
+                    warn!(
+                        "{}: {} points to {} now, treating as removed",
+                        mapping,
+                        pretty_path(name),
+                        pretty_path(&link_target)
+                    );
+                    continue;
+                }
+            }
+        } else {
+            warn!(
+                "{}: {} doesn't exist anymore or is not a symbolic link, treating as removed",
                 mapping,
                 pretty_path(name)
             );
             continue;
-        }
-
-        let target_cur = mapping.name().canonicalize().unwrap();
-        if target_cur != target.canonicalize().unwrap() {
-            warn!(
-                "{}: {} points to {} now, won't remove",
-                mapping,
-                pretty_path(name),
-                pretty_path(&target_cur)
-            );
-            not_removed.push(mapping);
-            continue;
-        }
+        };
 
         if let Ok(()) = fs::remove_file(name) {
             info!("{}: removed", mapping);
-            if let Some(parent) = name.parent() {
-                if opt.rmdir && parent.read_dir().unwrap().next().is_none() {
+            if !opt.rmdir {
+                continue;
+            }
+
+            let mut cur = name.as_path();
+            while let Some(parent) = cur.parent() {
+                if parent.exists() && parent.read_dir().unwrap().next().is_none() {
                     if fs::remove_dir(parent).is_ok() {
                         info!(
                             "{}: removed empty parent dir {}",
                             mapping,
                             pretty_path(parent)
                         );
+                        cur = parent;
                     } else {
                         error!(
                             "{}: failed to remove empty parent dir {}",
                             mapping,
                             pretty_path(parent)
                         );
+                        break;
                     }
+                } else {
+                    break;
                 }
             }
         } else {
@@ -68,3 +81,5 @@ pub fn clean(mut cache: Cache, opt: CleanOptions) -> Cache {
 
     Cache::new(not_removed)
 }
+
+fn remove_link(rmdir: bool) {}
