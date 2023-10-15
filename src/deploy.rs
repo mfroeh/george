@@ -169,7 +169,7 @@ mod tests {
         fs::create_dir_all(format!("{DOTFILE_DIR}/config/empty")).unwrap();
 
         let config = Config::build(&format!("{HOME_DIR}/.config -> {DOTFILE_DIR}/config")).unwrap();
-        let result = expand_mappings(&DeployOptions::default(), &config.mappings());
+        let result = expand_mappings(&DeployOptions::default(), config.mappings());
 
         assert!(result.contains(&Mapping::new(
             &format!("{HOME_DIR}/.config/nvim/init.lua"),

@@ -1,15 +1,14 @@
 use std::{
     error::Error,
     fs::{self},
-    io,
     path::PathBuf,
 };
 
-use chrono::{format::format, Local};
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 use walkdir::{DirEntry, WalkDir};
 
-use crate::{clean, Mapping, HOME_DIR};
+use crate::{Mapping, HOME_DIR};
 
 #[derive(Serialize, Deserialize)]
 pub struct Cache {

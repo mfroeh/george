@@ -1,6 +1,6 @@
-use std::fs::{self, symlink_metadata};
+use std::fs::{self};
 
-use clap::error;
+
 use log::{error, info, warn};
 
 use crate::{cache::Cache, pretty_path, Mapping};
@@ -81,5 +81,3 @@ pub fn clean(mut cache: Cache, opt: CleanOptions) -> Cache {
 
     Cache::new(not_removed)
 }
-
-fn remove_link(rmdir: bool) {}

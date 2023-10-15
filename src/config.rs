@@ -65,6 +65,7 @@ impl Config {
 
             let name = mapping[0].trim();
             let target = mapping[1].trim();
+
             mappings.push(Mapping::new(name, target));
         }
 
