@@ -10,25 +10,21 @@ use crate::{
     pretty_path, Mapping,
 };
 
+#[derive(Debug, Default)]
 pub struct DeployOptions {
-    /// The mappings loaded from the config
-    mappings: Vec<Mapping>,
+    rmdir: bool,
 }
 
 impl DeployOptions {
-    pub fn new(config: &Config) -> Self {
-        DeployOptions {
-            mappings: config.mappings().to_owned(),
-        }
-    }
-
-    fn renamethis(mappings: Vec<Mapping>) -> DeployOptions {
-        DeployOptions { mappings }
+    pub fn new(rmdir: bool) -> Self {
+        DeployOptions { rmdir }
     }
 }
 
-pub fn deploy(cache: Cache, opt: DeployOptions) -> Cache {
-    let expanded: Vec<Mapping> = expand_mappings(opt).into_iter().collect();
+pub fn deploy(cache: Cache, opt: DeployOptions, config: Config) -> Cache {
+    let expanded: Vec<Mapping> = expand_mappings(&opt, config.mappings())
+        .into_iter()
+        .collect();
 
     // Remove all previously created mappings that have become redundant
     let redundant_mappings: Vec<Mapping> = cache
@@ -39,7 +35,7 @@ pub fn deploy(cache: Cache, opt: DeployOptions) -> Cache {
         .collect();
 
     // If we couldn't remove some of the mappings, we have to keep them in the cache
-    let mut existing = clean::clean(Cache::new(redundant_mappings), CleanOptions::default())
+    let mut existing = clean::clean(Cache::new(redundant_mappings), CleanOptions::new(opt.rmdir))
         .mappings
         .take()
         .unwrap();
@@ -82,10 +78,10 @@ pub fn deploy(cache: Cache, opt: DeployOptions) -> Cache {
     Cache::new(existing)
 }
 
-fn expand_mappings(opt: DeployOptions) -> HashSet<Mapping> {
+fn expand_mappings(opt: &DeployOptions, mappings: &[Mapping]) -> HashSet<Mapping> {
     let mut set = HashSet::new();
 
-    for mapping in opt.mappings.iter() {
+    for mapping in mappings.iter() {
         let Mapping { name, target } = mapping;
 
         // Target has to exist
@@ -114,10 +110,8 @@ fn expand_mappings(opt: DeployOptions) -> HashSet<Mapping> {
                 .filter(|e| e.path().is_file())
                 .map(make_mapping);
 
-            let options = DeployOptions::renamethis(files.collect());
-
             info!("{}: beginning expansion", mapping);
-            set.extend(expand_mappings(options));
+            set.extend(expand_mappings(opt, &files.collect::<Vec<_>>()));
             continue;
         }
 
@@ -175,7 +169,7 @@ mod tests {
         fs::create_dir_all(format!("{DOTFILE_DIR}/config/empty")).unwrap();
 
         let config = Config::build(&format!("{HOME_DIR}/.config -> {DOTFILE_DIR}/config")).unwrap();
-        let result = expand_mappings(DeployOptions::new(&config));
+        let result = expand_mappings(&DeployOptions::default(), &config.mappings());
 
         assert!(result.contains(&Mapping::new(
             &format!("{HOME_DIR}/.config/nvim/init.lua"),
@@ -198,7 +192,7 @@ mod tests {
         fs::write(&name, "").unwrap();
 
         let config = Config::build(&format!("{name} -> {target}")).unwrap();
-        let result = deploy(Cache::default(), DeployOptions::new(&config));
+        let result = deploy(Cache::default(), DeployOptions::default(), config);
 
         let expected = vec![];
         assert_eq!(result.mappings(), expected);
@@ -215,7 +209,7 @@ mod tests {
         let name = format!("{HOME_DIR}/.zshrc");
 
         let config = Config::build(&format!("{name} -> {target}")).unwrap();
-        let result = deploy(Cache::default(), DeployOptions::new(&config));
+        let result = deploy(Cache::default(), DeployOptions::default(), config);
 
         let expected = vec![Mapping::new(&name, &target)];
         assert_eq!(result.mappings(), expected);
@@ -237,7 +231,7 @@ mod tests {
         let name = format!("{HOME_DIR}/.config/nvim/init.lua");
 
         let config = Config::build(&format!("{name} -> {target}")).unwrap();
-        let result = deploy(Cache::default(), DeployOptions::new(&config));
+        let result = deploy(Cache::default(), DeployOptions::default(), config);
 
         let expected = vec![Mapping::new(&name, &target)];
         assert_eq!(result.mappings(), expected);
@@ -258,7 +252,7 @@ mod tests {
         let name = format!("{HOME_DIR}/.config/nvim");
 
         let config = Config::build(&format!("{name} -> {target}")).unwrap();
-        let result = deploy(Cache::default(), DeployOptions::new(&config));
+        let result = deploy(Cache::default(), DeployOptions::default(), config);
 
         let expected = vec![];
         assert_eq!(result.mappings(), expected);
@@ -278,7 +272,7 @@ mod tests {
         let name = format!("{HOME_DIR}/.config/nvim");
 
         let config = Config::build(&format!("{name} -> {target}")).unwrap();
-        let result = deploy(Cache::default(), DeployOptions::new(&config));
+        let result = deploy(Cache::default(), DeployOptions::default(), config);
 
         let init_link = &format!("{HOME_DIR}/.config/nvim/init.lua");
 
@@ -310,7 +304,7 @@ mod tests {
         let name = format!("{HOME_DIR}/.config/nvim");
 
         let config = Config::build(&format!("{name} -> {target}")).unwrap();
-        let result = deploy(Cache::default(), DeployOptions::new(&config));
+        let result = deploy(Cache::default(), DeployOptions::default(), config);
 
         let init_link = format!("{HOME_DIR}/.config/nvim/init.lua");
         let nested_link = format!("{HOME_DIR}/.config/nvim/lua/guy/nested.lua");
@@ -355,7 +349,7 @@ mod tests {
             {name2} -> {target2}"
         ))
         .unwrap();
-        let result = deploy(Cache::default(), DeployOptions::new(&config));
+        let result = deploy(Cache::default(), DeployOptions::default(), config);
 
         let init_link = format!("{name}/init.lua");
 
