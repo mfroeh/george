@@ -2,10 +2,13 @@ use std::{
     error::Error,
     fmt::Display,
 };
+use std::path::PathBuf;
+use std::fs;
 use crate::Mapping;
 
 #[derive(Debug, PartialEq)]
 pub struct Config {
+    path: PathBuf,
     mappings: Vec<Mapping>,
 }
 
@@ -55,21 +58,27 @@ impl Error for ConfigFormatError {
 }
 
 impl Config {
-    pub fn build(content: &str) -> Result<Config, ConfigFormatError> {
+    pub fn build(path: PathBuf) -> Result<Config, ConfigFormatError> {
+        // TODO: Anyhow
+        let content = fs::read_to_string(&path).unwrap();
+        let config_dir = path.parent().unwrap();
+
         let mut mappings = Vec::new();
         for (i, line) in content.lines().filter(|l| !l.is_empty()).enumerate() {
             let mapping: Vec<&str> = line.split("->").collect();
             if mapping.len() != 2 {
+                // TODO: use anyhow?
                 return Err(ConfigFormatError::new(line, i + 1));
             }
 
             let name = mapping[0].trim();
             let target = mapping[1].trim();
+            let target = format!("{}/{}", config_dir.to_str().unwrap(), target);
 
-            mappings.push(Mapping::new(name, target));
+            mappings.push(Mapping::new(name, &target));
         }
 
-        let config = Config { mappings };
+        let config = Config { path, mappings };
         Ok(config)
     }
 }

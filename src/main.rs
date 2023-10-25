@@ -1,5 +1,6 @@
-use std::fs;
+use std::{fs, path::{Path, PathBuf}, io, env};
 
+use anyhow::{Context, Result, anyhow};
 use clap::{command, Parser, Subcommand};
 use env_logger::Builder;
 use george::{
@@ -20,6 +21,10 @@ struct Cli {
     /// Keep remaining empty directories
     #[arg(short, long)]
     keep_dir: bool,
+
+    /// Full path to the config file (including name)
+    #[arg(short, long)]
+    config: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -32,7 +37,7 @@ enum Commands {
     Redeploy {},
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let mut builder = Builder::new();
     builder
         .filter(None, log::LevelFilter::Info)
@@ -46,8 +51,12 @@ fn main() {
 
     match cli.command {
         Commands::Deploy {} => {
-            let cfg = fs::read_to_string(".george").unwrap();
-            let cfg = Config::build(&cfg).unwrap();
+            let path = if let Some(path) = &cli.config {
+                PathBuf::from(path)
+            } else {
+                find_config().context("Failed to find config")?
+            };
+            let cfg = Config::build(path)?;
             let cache = Cache::load().unwrap_or_default();
             let new_cache = deploy(cache, DeployOptions::new(!cli.keep_dir), cfg);
             new_cache.save().expect("Failed to save cache");
@@ -59,4 +68,21 @@ fn main() {
         }
         Commands::Redeploy {} => {}
     }
+    Ok(())
+}
+
+pub fn find_config() -> Option<PathBuf> {
+    let cwd = env::current_dir().unwrap();
+    let config = cwd.join(".george");
+    if config.exists() {
+        return Some(config);
+    }
+
+    for parent in cwd.ancestors() {
+        let config = parent.join(".george");
+        if config.exists() {
+            return Some(config);
+        }
+    }
+    None
 }
