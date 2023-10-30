@@ -56,15 +56,23 @@ pub fn deploy(cache: Cache, opt: DeployOptions, config: Config) -> Cache {
             }
         }
 
-        // If link already exists and is created by us
-        if name.exists() && cache.contains(&mapping) {
-            info!(
-                "{}: '{}' exists already and was created by us, not creating new link",
-                mapping,
-                pretty_path(name)
-            );
-            existing.push(mapping);
-            continue;
+        // If link (or file) already exists
+        if name.exists() {
+            // If we created link
+            if cache.contains(&mapping) {
+                existing.push(mapping);
+                continue;
+            } else {
+                let full_filename = name.to_str().unwrap();
+                let mut backup = name.to_str().unwrap().to_owned();
+                backup += ".backup";
+                if fs::rename(&name, &backup).is_ok() {
+                    info!("{}: {} already exists, backing up to {}", mapping, full_filename, backup);
+                } else {
+                    error!("{}: {} already exist and failed to create {}", mapping, full_filename, backup);
+                    continue;
+                }
+            }
         }
 
         if let Ok(()) = symlink(target, name) {
